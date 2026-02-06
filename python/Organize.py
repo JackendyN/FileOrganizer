@@ -16,13 +16,12 @@ def AlphabeticalSort(directory, target, sortingAll, allLetters, letterRanges=Non
                             targetRange = letterRange
                             break
                     if targetRange == "":
-                        continue
+                        continue # Within the context of this section, this should not be reached
                     else:
                         os.makedirs(os.path.join(target, targetRange), exist_ok=True)
                         newLocation = os.path.join(target, targetRange, file)
                         os.rename(os.path.join(directory, file), newLocation)
         print("Done!")
-
 
 def CheckLetterRange(ranges):
     ranges = ranges.replace(" ", "")
