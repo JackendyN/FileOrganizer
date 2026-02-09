@@ -1,33 +1,41 @@
 import os
 
+def SortFile(originalLocation, targetLocation, folderName, file):
+    os.makedirs(os.path.join(targetLocation, folderName), exist_ok=True)
+    newLocation = os.path.join(targetLocation, folderName, file)
+    os.rename(os.path.join(originalLocation, file), newLocation)
+
 def AlphabeticalSort(directory, target, sortingAll, allLetters, letterRanges=None):
     fileList = os.listdir(directory)
-    if sortingAll:
-        for file in fileList:
-            if os.path.isfile(os.path.join(directory, file)):
-                if allLetters:
-                    os.makedirs(os.path.join(target, file[0].upper()), exist_ok=True)
-                    newLocation = os.path.join(target, file[0].upper(), file)
-                    os.rename(os.path.join(directory, file), newLocation)
-                else:
-                    targetRange = ""
-                    for letterRange in letterRanges:
-                        if ord(letterRange[0].upper()) <= ord(file[0].upper()) <= ord(letterRange[2].upper()):
-                            targetRange = letterRange
-                            break
-                    if targetRange == "":
-                        continue # Within the context of this section, this should not be reached
+    for file in fileList:
+        if os.path.isfile(os.path.join(directory, file)):
+            if allLetters:
+                SortFile(directory, target, file[0].upper, file)
+            else:
+                targetRange = ""
+                for letterRange in letterRanges:
+                    if not file[0].isalpha():
+                        break
+                    if (len(letterRange) == 1 and file[0].upper() == letterRange) or (len(letterRange) != 1 and (ord(letterRange[0].upper()) <= ord(file[0].upper()) <= ord(letterRange[2].upper()))):
+                        targetRange = letterRange
+                        break
+                if targetRange == "":
+                    if sortingAll:
+                        SortFile(directory, target, "Misc", file)
                     else:
-                        os.makedirs(os.path.join(target, targetRange), exist_ok=True)
-                        newLocation = os.path.join(target, targetRange, file)
-                        os.rename(os.path.join(directory, file), newLocation)
-        print("Done!")
+                        continue
+                else:
+                    SortFile(directory, target, targetRange, file)
+
+    print("Done!")
 
 def CheckLetterRange(ranges):
     ranges = ranges.replace(" ", "")
     rangeList = ranges.split(',')
     letterCount = len(rangeList)
     for lRange in rangeList:
+        if len(lRange) != 3:
+            return False
         if not (lRange[2].isalpha and lRange[0].isalpha):
             return False
         letterCount += (ord(lRange[2].upper()) - ord(lRange[0].upper()))
@@ -64,6 +72,22 @@ def Start():
                     rangeInput = rangeInput.replace(" ", "")
                     rangeList = rangeInput.split(',')
                     AlphabeticalSort(directoryToOrganize, targetDirectory, allFiles, False, rangeList)
+            else:
+                chosenRanges = input("Enter the letter(s) you would like to sort (Example: A, C, G-M): ")
+                while True:
+                    validLetters = True
+                    chosenRanges = chosenRanges.replace(' ', '')
+                    chosenRanges = chosenRanges.split(',')
+                    for cRange in chosenRanges:
+                        if (len(cRange) == 1 and not cRange.isalpha()) or (len(cRange) != 3 and len(cRange) != 1):
+                            validLetters = False
+                            break
+                    if validLetters:
+                        break
+                    else:
+                        chosenRanges = input("There was an issue with what you entered. Try again (Example: A, C, G-H): ")
+                AlphabeticalSort(directoryToOrganize, targetDirectory, allFiles, False, chosenRanges)
+
 
         case _:
             pass
