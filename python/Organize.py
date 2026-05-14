@@ -1,95 +1,86 @@
 import os
+from enum import Enum
+import FileInfo
 
-def SortFile(originalLocation, targetLocation, folderName, file):
+class SortMethod(Enum):
+    ALPHABETICAL = 0
+    EXTENSION = 1
+
+def IsolateFile(filePath):
+    i = filePath.rfind(os.sep)
+    if i != -1:
+        return filePath[i + 1:]
+    else:
+        return filePath
+
+def MoveFile(originalLocation, targetLocation, folderName, file):
     os.makedirs(os.path.join(targetLocation, folderName), exist_ok=True)
-    newLocation = os.path.join(targetLocation, folderName, file)
+    newLocation = os.path.join(targetLocation, folderName, IsolateFile(file))
     os.rename(os.path.join(originalLocation, file), newLocation)
 
-def GetDefinition(extension, definitions):
-    for definition, extensions in definitions.items():
-        if extension in extensions:
-            return definition
-    return "Other"
+def AddFolderFiles(directory, originalDirectoryLength):
+    files = os.listdir(directory)
+    newFiles = []
+    for file in files:
+        filePath = os.path.join(directory, file)
+        if os.path.isdir(filePath):
+            newFiles += AddFolderFiles(filePath, originalDirectoryLength)
+        elif os.path.isfile(filePath):
+            newFiles.append(filePath[(originalDirectoryLength + 1):])
 
-def AlphabeticalSort(directory, target, sortingAll, allLetters, letterRanges=None):
-    fileList = os.listdir(directory)
+    return newFiles
+
+def SortFiles(directory, target, method, includingFolders, allLetters=False, letterRanges=None, usingGroups=False, usingCustomGroups=False, fileGroups=None):
+    if includingFolders:
+        fileList = AddFolderFiles(directory, len(directory))
+    else:
+        fileList = os.listdir(directory)
     for file in fileList:
-        if os.path.isfile(os.path.join(directory, file)):
-            if allLetters:
-                if file[0].isalpha():
-                    SortFile(directory, target, file[0].upper(), file)
-                else:
-                    SortFile(directory, target, "Misc", file)
-            else:
-                targetRange = ""
-                for letterRange in letterRanges:
-                    if not file[0].isalpha():
-                        break
-                    if (len(letterRange) == 1 and file[0].upper() == letterRange) or (len(letterRange) != 1 and (ord(letterRange[0].upper()) <= ord(file[0].upper()) <= ord(letterRange[2].upper()))):
-                        targetRange = letterRange
-                        break
-                if targetRange == "":
-                    if sortingAll:
-                        SortFile(directory, target, "Misc", file)
+        match method:
+
+            # Alphabetical sorting
+            case SortMethod.ALPHABETICAL:
+                if allLetters:
+                    if file[0].isalpha():
+                        MoveFile(directory, target, file[0].upper(), file) # Needs to somehow get to the original location inside folders
                     else:
-                        continue
+                        MoveFile(directory, target, "Misc", file)
                 else:
-                    SortFile(directory, target, targetRange, file)
+                    tempFile = IsolateFile(file)
+                    targetRange = ""
+                    for letterRange in letterRanges:
+                        if not file[0].isalpha():
+                            break
+                        if (len(letterRange) == 1 and tempFile[0].upper() == letterRange) or (len(letterRange) != 1 and (
+                                ord(letterRange[0].upper()) <= ord(tempFile[0].upper()) <= ord(letterRange[2].upper()))):
+                            targetRange = letterRange
+                            break
+                    if targetRange == "":
+                        MoveFile(directory, target, "Misc", file)
+                    else:
+                        MoveFile(directory, target, targetRange, file)
 
-    print("Done!")
-
-def FileTypeSort(directory, target, sortingAll, usingGroups, usingCustomGroups, fileGroups = None):
-    fileDefinitions = { # Revised with AI
-        "Documents": {
-        ".doc", ".docx", ".pdf", ".txt", ".rtf",
-        ".odt", ".pages", ".md"
-        },
-        "Spreadsheets": { ".xls", ".xlsx", ".csv", ".ods" },
-        "Presentations": { ".ppt", ".pptx", ".key" },
-        "Source Code": {
-            ".py", ".java", ".cs", ".cpp", ".c", ".h",
-            ".js", ".ts", ".html", ".css", ".php",
-            ".rb", ".go", ".swift", ".kt", ".sql"
-        },
-        "Images": {
-            ".png", ".jpg", ".jpeg", ".gif",
-            ".bmp", ".tiff", ".webp", ".svg"
-        },
-        "Videos": {
-            ".mp4", ".avi", ".mov", ".mkv",
-            ".wmv", ".flv", ".webm"
-        },
-        "Audio": { ".mp3", ".wav", ".aac", ".flac", ".ogg", ".m4a" },
-        "Archives": { ".zip", ".rar", ".7z", ".tar", ".gz", ".bz2" },
-        "Executables": { ".exe", ".msi", ".bat", ".sh", ".app" }
-    }
-
-    fileList = os.listdir(directory)
-    for file in fileList:
-        if os.path.isfile(os.path.join(directory, file)):
-            splitFile = file.split('.')
-            extension = '.' + splitFile[len(splitFile) - 1].lower()
-            if sortingAll:
+            # File extension sorting
+            case SortMethod.EXTENSION:
+                splitFile = file.split('.')
+                extension = '.' + splitFile[len(splitFile) - 1].lower()
                 if not usingGroups:
-                    SortFile(directory, target, extension, file)
+                    MoveFile(directory, target, extension, file)
                 else:
                     if usingCustomGroups:
                         foundGroup = False
                         for group in fileGroups:
                             groupName = ', '.join(group)
                             if extension in group:
-                                SortFile(directory, target, groupName, file)
+                                MoveFile(directory, target, groupName, file)
                                 foundGroup = True
                                 break
                         if not foundGroup:
-                            SortFile(directory, target, extension, file)
+                            MoveFile(directory, target, extension, file)
 
                     else:
-                        definition = GetDefinition(extension, fileDefinitions)
-                        SortFile(directory, target, definition, file)
-
-            else:
-                pass
+                        definition = FileInfo.GetDefinition(extension)
+                        MoveFile(directory, target, definition, file)
 
     print("Done!")
 
@@ -115,65 +106,42 @@ def Start():
         targetDirectory = input("Target directory: ")
         while not os.path.exists(targetDirectory):
             targetDirectory = input("The target directory to put the organized files in does not exist. Please try again: ")
-    allFiles = True
-    allFilesInput = input("Are you organizing all files, or just a specific set? (ALL/SPECIFIC): ")
-    if allFilesInput.lower() == "specific":
-        allFiles = False
+    foldersInput = input("Include files already inside folders? (Y/N): ")
+    includeFolders = False
+    if foldersInput.upper() == 'Y': includeFolders = True
 
     print("How will the files be organized?\n1. Alphabetical\n2. File Extension/Type\n3. Date Created\n4. Tags within file names\n5. Word Count (For Documents)")
     userChoice = input('> ')
     match userChoice:
         case '1':
-            if allFiles:
-                allLettersInput = input("Will you be sorting every letter individually? (Y/N): ")
-                if allLettersInput.lower() == 'y':
-                    AlphabeticalSort(directoryToOrganize, targetDirectory, allFiles, True)
-                else:
-                    rangeInput = input("Enter specific letter ranges to sort by (Example: A-D, E-F, G-Z): ")
-                    while CheckLetterRange(rangeInput) == False:
-                        rangeInput = input("Invalid Range. Please try again: ")
-                    rangeInput = rangeInput.replace(" ", "")
-                    rangeList = rangeInput.split(',')
-                    AlphabeticalSort(directoryToOrganize, targetDirectory, allFiles, False, rangeList)
-
+            allLettersInput = input("Will you be sorting every letter individually? (Y/N): ")
+            if allLettersInput.lower() == 'y':
+                SortFiles(directoryToOrganize, targetDirectory, SortMethod.ALPHABETICAL, includeFolders, allLetters=True)
             else:
-                chosenRanges = input("Enter the letter(s) you would like to sort (Example: A, C, G-M): ")
-                while True:
-                    validLetters = True
-                    chosenRanges = chosenRanges.replace(' ', '').split(',')
-                    for cRange in chosenRanges:
-                        if (len(cRange) == 1 and not cRange.isalpha()) or (len(cRange) != 3 and len(cRange) != 1):
-                            validLetters = False
-                            break
-                    if validLetters:
-                        break
-                    else:
-                        chosenRanges = input("There was an issue with what you entered. Try again (Example: A, C, G-H): ")
-                AlphabeticalSort(directoryToOrganize, targetDirectory, allFiles, False, chosenRanges)
+                rangeInput = input("Enter specific letter ranges to sort by (Example: A-D, E-F, G-Z): ")
+                while not CheckLetterRange(rangeInput):
+                    rangeInput = input("Invalid Range. Please try again: ")
+                rangeInput = rangeInput.replace(" ", "")
+                rangeList = rangeInput.split(',')
+                SortFiles(directoryToOrganize, targetDirectory, SortMethod.ALPHABETICAL, includeFolders, letterRanges=rangeList)
 
         case '2':
-            if allFiles:
-                filesGrouped = input("Would you like certain file types to be grouped together? (Y/N): ")
-                if filesGrouped.upper() == 'Y':
-                    customNames = input("Use built-in (Documents, Videos, Images, etc)? (Y/N): ")
-                    if customNames.upper() == 'Y':
-                        FileTypeSort(directoryToOrganize, targetDirectory, allFiles, True, False)
-                    else:
-                        fileGroups = []
-                        while True:
-                            group = input("Add file types to be grouped, separated by commas (.pdf, .txt, .docx). Enter nothing to finish: ")
-                            if not group:
-                                break
-                            group = group.replace(' ', '').split(',')
-                            fileGroups.append(group)
-                        FileTypeSort(directoryToOrganize, targetDirectory, allFiles, True, True, fileGroups)
+            filesGrouped = input("Would you like certain file types to be grouped together? (Y/N): ")
+            if filesGrouped.upper() == 'Y':
+                customNames = input("Use built-in (Documents, Videos, Images, etc)? (Y/N): ")
+                if customNames.upper() == 'Y':
+                    SortFiles(directoryToOrganize, targetDirectory, SortMethod.EXTENSION, includeFolders, usingGroups=True, usingCustomGroups=False)
                 else:
-                    FileTypeSort(directoryToOrganize, targetDirectory, allFiles, False, False)
-
+                    fileGroups = []
+                    while True:
+                        group = input("Add file types to be grouped, separated by commas (.pdf, .txt, .docx). Enter nothing to finish: ")
+                        if not group:
+                            break
+                        group = group.replace(' ', '').split(',')
+                        fileGroups.append(group)
+                    SortFiles(directoryToOrganize, targetDirectory, SortMethod.EXTENSION, includeFolders, usingGroups=True, usingCustomGroups=True, fileGroups=fileGroups)
             else:
-                fileTypes = input("Provide the type extensions you would like to be organized, spaced by commas (.pdf, .txt, .docx): ")
-                grouped = input("Would you like them separated? (Y/N): ")
-
+                SortFiles(directoryToOrganize, targetDirectory, SortMethod.EXTENSION, includeFolders)
 
         case _:
             pass
