@@ -1,11 +1,14 @@
 import os
+import time
 from enum import Enum
 import FileInfo
 
 class SortMethod(Enum):
     ALPHABETICAL = 0
     EXTENSION = 1
+    DATE = 2
 
+# Isolates file name from any path still possibly attached
 def IsolateFile(filePath):
     i = filePath.rfind(os.sep)
     if i != -1:
@@ -36,13 +39,15 @@ def SortFiles(directory, target, method, includingFolders, allLetters=False, let
     else:
         fileList = os.listdir(directory)
     for file in fileList:
+        if not os.path.isfile(os.path.join(directory, file)):
+            continue
         match method:
 
             # Alphabetical sorting
             case SortMethod.ALPHABETICAL:
                 if allLetters:
-                    if file[0].isalpha():
-                        MoveFile(directory, target, file[0].upper(), file) # Needs to somehow get to the original location inside folders
+                    if IsolateFile(file)[0].isalpha():
+                        MoveFile(directory, target, IsolateFile(file)[0].upper(), file)
                     else:
                         MoveFile(directory, target, "Misc", file)
                 else:
@@ -82,6 +87,15 @@ def SortFiles(directory, target, method, includingFolders, allLetters=False, let
                         definition = FileInfo.GetDefinition(extension)
                         MoveFile(directory, target, definition, file)
 
+            # File date sorting
+            case SortMethod.DATE:
+                months = ("January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December")
+                fileTime = time.localtime(os.path.getctime(os.path.join(directory, file)))
+                if usingGroups:
+                    MoveFile(directory, target, f"{months[fileTime.tm_mon - 1]} {fileTime.tm_year}", file)
+                else:
+                    MoveFile(directory, target, f"{fileTime.tm_year}", file)
+
     print("Done!")
 
 def CheckLetterRange(ranges):
@@ -113,6 +127,7 @@ def Start():
     print("How will the files be organized?\n1. Alphabetical\n2. File Extension/Type\n3. Date Created\n4. Tags within file names\n5. Word Count (For Documents)")
     userChoice = input('> ')
     match userChoice:
+
         case '1':
             allLettersInput = input("Will you be sorting every letter individually? (Y/N): ")
             if allLettersInput.lower() == 'y':
@@ -142,6 +157,14 @@ def Start():
                     SortFiles(directoryToOrganize, targetDirectory, SortMethod.EXTENSION, includeFolders, usingGroups=True, usingCustomGroups=True, fileGroups=fileGroups)
             else:
                 SortFiles(directoryToOrganize, targetDirectory, SortMethod.EXTENSION, includeFolders)
+
+        case '3':
+            dateSortChoice = input("Would you like to sort by month or year? (MONTH/YEAR): ").lower()
+            while dateSortChoice != ("month" or "year"): dateSortChoice = input("Try again (MONTH/YEAR): ").lower()
+            if dateSortChoice == "month":
+                SortFiles(directoryToOrganize, targetDirectory, SortMethod.DATE, includeFolders, usingGroups=True)
+            else:
+                SortFiles(directoryToOrganize, targetDirectory, SortMethod.DATE, includeFolders, usingGroups=False)
 
         case _:
             pass
