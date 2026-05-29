@@ -7,6 +7,7 @@ class SortMethod(Enum):
     ALPHABETICAL = 0
     EXTENSION = 1
     DATE = 2
+    TAG = 3
 
 # Isolates file name from any path still possibly attached
 def IsolateFile(filePath):
@@ -33,7 +34,7 @@ def AddFolderFiles(directory, originalDirectoryLength):
 
     return newFiles
 
-def SortFiles(directory, target, method, includingFolders, allLetters=False, letterRanges=None, usingGroups=False, usingCustomGroups=False, fileGroups=None):
+def SortFiles(directory, target, method, includingFolders, allLetters=False, letterRanges=None, usingGroups=False, usingCustomGroups=False, fileGroups=None, nameTag=None, tagFolder=None):
     if includingFolders:
         fileList = AddFolderFiles(directory, len(directory))
     else:
@@ -96,6 +97,18 @@ def SortFiles(directory, target, method, includingFolders, allLetters=False, let
                 else:
                     MoveFile(directory, target, f"{fileTime.tm_year}", file)
 
+            # Sorting files with a certain tag in their name
+            case SortMethod.TAG:
+                isolatedFile = IsolateFile(file)
+                extensionStart = isolatedFile.rfind('.')
+                isolatedFile = isolatedFile[0:extensionStart]
+                if nameTag.lower() in isolatedFile.lower():
+                    if not tagFolder:
+                        MoveFile(directory, target, nameTag, file)
+                    else:
+                        MoveFile(directory, target, tagFolder, file)
+
+
     print("Done!")
 
 def CheckLetterRange(ranges):
@@ -124,7 +137,7 @@ def Start():
     includeFolders = False
     if foldersInput.upper() == 'Y': includeFolders = True
 
-    print("How will the files be organized?\n1. Alphabetical\n2. File Extension/Type\n3. Date Created\n4. Tags within file names\n5. Word Count (For Documents)")
+    print("How will the files be organized?\n1. Alphabetical\n2. File Extension/Type\n3. Date Created\n4. Tags within file names\n")
     userChoice = input('> ')
     match userChoice:
 
@@ -166,5 +179,10 @@ def Start():
             else:
                 SortFiles(directoryToOrganize, targetDirectory, SortMethod.DATE, includeFolders, usingGroups=False)
 
+        case '4':
+            tag = input("Include files with what in their file name? (Example: *HIST 1101* Essay 1): ")
+            folderName = input("What should the folder be called? (Leave blank to use tag given): ")
+            SortFiles(directoryToOrganize, targetDirectory, SortMethod.TAG, includeFolders, nameTag=tag, tagFolder=folderName)
+
         case _:
-            pass
+            print("Invalid choice.")

@@ -1,5 +1,4 @@
-# Creates a folder on the desktop with randomly named files for testing purposes, replaces it if it already exists, then optionally sorts it
-# not responsible for anything that happens if you try actually opening these files so please don't
+# Creates a folder on the desktop with randomly named files for testing purposes
 import os
 import shutil
 import random
@@ -15,5 +14,4 @@ os.makedirs(testDirectory, exist_ok=False)
 for i in range(300):
     fileName = ''.join(random.choices(string.ascii_letters + string.digits, k=8)) + random.choice(extensions)
     open(os.path.join(testDirectory, fileName), 'w')
-# Organize.SortFiles(testDirectory, testDirectory, Organize.SortMethod.EXTENSION, True, usingGroups=True)
 print("Done!")
