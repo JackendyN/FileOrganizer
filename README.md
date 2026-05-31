@@ -13,3 +13,5 @@
   * Based on months, or years
 * Common parts within file names
   * Example: Sorting English assignments by "ENGL"
+
+**Additionally, every file movement is logged and can be reversed, as long as it is not already moved.**

@@ -1,7 +1,10 @@
 import os
 import time
+from datetime import datetime
 from enum import Enum
-import FileInfo
+
+import FileMisc
+
 
 class SortMethod(Enum):
     ALPHABETICAL = 0
@@ -9,180 +12,206 @@ class SortMethod(Enum):
     DATE = 2
     TAG = 3
 
+
 # Isolates file name from any path still possibly attached
-def IsolateFile(filePath):
-    i = filePath.rfind(os.sep)
+def isolate_file(file_path):
+    i = file_path.rfind(os.sep)
     if i != -1:
-        return filePath[i + 1:]
+        return file_path[i + 1:]
     else:
-        return filePath
+        return file_path
 
-def MoveFile(originalLocation, targetLocation, folderName, file):
-    os.makedirs(os.path.join(targetLocation, folderName), exist_ok=True)
-    newLocation = os.path.join(targetLocation, folderName, IsolateFile(file))
-    os.rename(os.path.join(originalLocation, file), newLocation)
 
-def AddFolderFiles(directory, originalDirectoryLength):
+def move_file(original_location, target_location, folder_name, file):
+    old_location = os.path.join(original_location, file)
+    os.makedirs(os.path.join(target_location, folder_name), exist_ok=True)
+    new_location = os.path.join(target_location, folder_name, isolate_file(file))
+    os.rename(old_location, new_location)
+    log = old_location + " => " + str(new_location) + "\n"
+    return log
+
+
+def add_folder_files(directory, original_directory_length):
     files = os.listdir(directory)
-    newFiles = []
+    new_files = []
     for file in files:
-        filePath = os.path.join(directory, file)
-        if os.path.isdir(filePath):
-            newFiles += AddFolderFiles(filePath, originalDirectoryLength)
-        elif os.path.isfile(filePath):
-            newFiles.append(filePath[(originalDirectoryLength + 1):])
+        file_path = os.path.join(directory, file)
+        if os.path.isdir(file_path):
+            new_files += add_folder_files(file_path, original_directory_length)
+        elif os.path.isfile(file_path):
+            new_files.append(file_path[(original_directory_length + 1):])
 
-    return newFiles
+    return new_files
 
-def SortFiles(directory, target, method, includingFolders, allLetters=False, letterRanges=None, usingGroups=False, usingCustomGroups=False, fileGroups=None, nameTag=None, tagFolder=None):
-    if includingFolders:
-        fileList = AddFolderFiles(directory, len(directory))
+
+def sort_files(directory, target, method, including_folders, all_letters=False, letter_ranges=None, using_groups=False,
+               using_custom_groups=False, file_groups=None, name_tag=None, tag_folder=None):
+    if including_folders:
+        file_list = add_folder_files(directory, len(directory))
     else:
-        fileList = os.listdir(directory)
-    for file in fileList:
+        file_list = os.listdir(directory)
+    log_list = ["\n-- " + datetime.now().strftime("%m/%d/%Y %I:%M:%S %p") + " --\n"]
+    for file in file_list:
         if not os.path.isfile(os.path.join(directory, file)):
             continue
         match method:
 
             # Alphabetical sorting
             case SortMethod.ALPHABETICAL:
-                if allLetters:
-                    if IsolateFile(file)[0].isalpha():
-                        MoveFile(directory, target, IsolateFile(file)[0].upper(), file)
+                if all_letters:
+                    if isolate_file(file)[0].isalpha():
+                        log_list.append(move_file(directory, target, isolate_file(file)[0].upper(), file))
                     else:
-                        MoveFile(directory, target, "Misc", file)
+                        log_list.append(move_file(directory, target, "Misc", file))
                 else:
-                    tempFile = IsolateFile(file)
-                    targetRange = ""
-                    for letterRange in letterRanges:
+                    temp_file = isolate_file(file)
+                    target_range = ""
+                    for letter_range in letter_ranges:
                         if not file[0].isalpha():
                             break
-                        if (len(letterRange) == 1 and tempFile[0].upper() == letterRange) or (len(letterRange) != 1 and (
-                                ord(letterRange[0].upper()) <= ord(tempFile[0].upper()) <= ord(letterRange[2].upper()))):
-                            targetRange = letterRange
+                        if ((len(letter_range) == 1 and temp_file[0].upper() == letter_range)
+                                or (len(letter_range) != 1 and (
+                                        ord(letter_range[0].upper()) <= ord(temp_file[0].upper()) <= ord(letter_range[2].upper())))):
+                            target_range = letter_range
                             break
-                    if targetRange == "":
-                        MoveFile(directory, target, "Misc", file)
+                    if target_range == "":
+                        log_list.append(move_file(directory, target, "Misc", file))
                     else:
-                        MoveFile(directory, target, targetRange, file)
+                        log_list.append(move_file(directory, target, target_range, file))
 
             # File extension sorting
             case SortMethod.EXTENSION:
-                splitFile = file.split('.')
-                extension = '.' + splitFile[len(splitFile) - 1].lower()
-                if not usingGroups:
-                    MoveFile(directory, target, extension, file)
+                split_file = file.split('.')
+                extension = '.' + split_file[len(split_file) - 1].lower()
+                if not using_groups:
+                    log_list.append(move_file(directory, target, extension, file))
                 else:
-                    if usingCustomGroups:
-                        foundGroup = False
-                        for group in fileGroups:
-                            groupName = ', '.join(group)
+                    if using_custom_groups:
+                        found_group = False
+                        for group in file_groups:
+                            group_name = ','.join(group)
                             if extension in group:
-                                MoveFile(directory, target, groupName, file)
-                                foundGroup = True
+                                log_list.append(move_file(directory, target, group_name, file))
+                                found_group = True
                                 break
-                        if not foundGroup:
-                            MoveFile(directory, target, extension, file)
+                        if not found_group:
+                            log_list.append(move_file(directory, target, extension, file))
 
                     else:
-                        definition = FileInfo.GetDefinition(extension)
-                        MoveFile(directory, target, definition, file)
+                        definition = FileMisc.get_file_definition(extension)
+                        log_list.append(move_file(directory, target, definition, file))
 
             # File date sorting
             case SortMethod.DATE:
-                months = ("January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December")
-                fileTime = time.localtime(os.path.getctime(os.path.join(directory, file)))
-                if usingGroups:
-                    MoveFile(directory, target, f"{months[fileTime.tm_mon - 1]} {fileTime.tm_year}", file)
+                months = ("January", "February", "March", "April", "May", "June", "July", "August", "September",
+                          "October", "November", "December")
+                file_time = time.localtime(os.path.getctime(os.path.join(directory, file)))
+                if using_groups:
+                    log_list.append(
+                        move_file(directory, target, f"{months[file_time.tm_mon - 1]} {file_time.tm_year}", file))
                 else:
-                    MoveFile(directory, target, f"{fileTime.tm_year}", file)
+                    log_list.append(move_file(directory, target, f"{file_time.tm_year}", file))
 
             # Sorting files with a certain tag in their name
             case SortMethod.TAG:
-                isolatedFile = IsolateFile(file)
-                extensionStart = isolatedFile.rfind('.')
-                isolatedFile = isolatedFile[0:extensionStart]
-                if nameTag.lower() in isolatedFile.lower():
-                    if not tagFolder:
-                        MoveFile(directory, target, nameTag, file)
+                isolated_file = isolate_file(file)
+                extension_start = isolated_file.rfind('.')
+                isolated_file = isolated_file[0:extension_start]
+                if name_tag.lower() in isolated_file.lower():
+                    if not tag_folder:
+                        log_list.append(move_file(directory, target, name_tag, file))
                     else:
-                        MoveFile(directory, target, tagFolder, file)
+                        log_list.append(move_file(directory, target, tag_folder, file))
 
-
+    FileMisc.log_process(log_list)
     print("Done!")
 
-def CheckLetterRange(ranges):
+
+def check_letter_range(ranges):
     ranges = ranges.replace(" ", "")
-    rangeList = ranges.split(',')
-    letterCount = len(rangeList)
-    for lRange in rangeList:
-        if len(lRange) != 3:
+    range_list = ranges.split(',')
+    letter_count = len(range_list)
+    for l_range in range_list:
+        if len(l_range) != 3:
             return False
-        if not (lRange[2].isalpha and lRange[0].isalpha):
+        if not (l_range[2].isalpha and l_range[0].isalpha):
             return False
-        letterCount += (ord(lRange[2].upper()) - ord(lRange[0].upper()))
-    return letterCount == 26
+        letter_count += (ord(l_range[2].upper()) - ord(l_range[0].upper()))
+    return letter_count == 26
 
-def Start():
-    directoryToOrganize = input("Directory to organize: ")
-    while not os.path.exists(directoryToOrganize):
-        directoryToOrganize = input("The directory to organize you entered does not exist. Please enter it again: ")
-    targetDirectory = directoryToOrganize
-    samePlaceInput = input("Put folders in same directory? (Y/N): ")
-    if samePlaceInput.upper() != 'Y':
-        targetDirectory = input("Target directory: ")
-        while not os.path.exists(targetDirectory):
-            targetDirectory = input("The target directory to put the organized files in does not exist. Please try again: ")
-    foldersInput = input("Include files already inside folders? (Y/N): ")
-    includeFolders = False
-    if foldersInput.upper() == 'Y': includeFolders = True
 
-    print("How will the files be organized?\n1. Alphabetical\n2. File Extension/Type\n3. Date Created\n4. Tags within file names\n")
-    userChoice = input('> ')
-    match userChoice:
+def start():
+    directory_to_organize = input("Directory to organize: ")
+    while not os.path.exists(directory_to_organize):
+        directory_to_organize = input("The directory to organize you entered does not exist. Please enter it again: ")
+    target_directory = directory_to_organize
+    same_place_input = input("Put folders in same directory? (Y/N): ")
+    if same_place_input.upper() != 'Y':
+        target_directory = input("Target directory: ")
+        while not os.path.exists(target_directory):
+            target_directory = input(
+                "The target directory to put the organized files in does not exist. Please try again: ")
+    folders_input = input("Include files already inside folders? (Y/N): ")
+    include_folders = False
+    if folders_input.upper() == 'Y':
+        include_folders = True
+
+    print(
+        "How will the files be organized?\n1. Alphabetical\n2. File Extension/Type\n3. Date Created\n4. Tags within "
+        "file names\n")
+    user_choice = input('> ')
+    match user_choice:
 
         case '1':
-            allLettersInput = input("Will you be sorting every letter individually? (Y/N): ")
-            if allLettersInput.lower() == 'y':
-                SortFiles(directoryToOrganize, targetDirectory, SortMethod.ALPHABETICAL, includeFolders, allLetters=True)
+            all_letters_input = input("Will you be sorting every letter individually? (Y/N): ")
+            if all_letters_input.lower() == 'y':
+                sort_files(directory_to_organize, target_directory, SortMethod.ALPHABETICAL, include_folders,
+                           all_letters=True)
             else:
-                rangeInput = input("Enter specific letter ranges to sort by (Example: A-D, E-F, G-Z): ")
-                while not CheckLetterRange(rangeInput):
-                    rangeInput = input("Invalid Range. Please try again: ")
-                rangeInput = rangeInput.replace(" ", "")
-                rangeList = rangeInput.split(',')
-                SortFiles(directoryToOrganize, targetDirectory, SortMethod.ALPHABETICAL, includeFolders, letterRanges=rangeList)
+                range_input = input("Enter specific letter ranges to sort by (Example: A-D, E-F, G-Z): ")
+                while not check_letter_range(range_input):
+                    range_input = input("Invalid Range. Please try again: ")
+                range_input = range_input.replace(" ", "")
+                range_list = range_input.split(',')
+                sort_files(directory_to_organize, target_directory, SortMethod.ALPHABETICAL, include_folders,
+                           letter_ranges=range_list)
 
         case '2':
-            filesGrouped = input("Would you like certain file types to be grouped together? (Y/N): ")
-            if filesGrouped.upper() == 'Y':
-                customNames = input("Use built-in (Documents, Videos, Images, etc)? (Y/N): ")
-                if customNames.upper() == 'Y':
-                    SortFiles(directoryToOrganize, targetDirectory, SortMethod.EXTENSION, includeFolders, usingGroups=True, usingCustomGroups=False)
+            files_grouped = input("Would you like certain file types to be grouped together? (Y/N): ")
+            if files_grouped.upper() == 'Y':
+                custom_names = input("Use built-in (Documents, Videos, Images, etc)? (Y/N): ")
+                if custom_names.upper() == 'Y':
+                    sort_files(directory_to_organize, target_directory, SortMethod.EXTENSION, include_folders,
+                               using_groups=True, using_custom_groups=False)
                 else:
-                    fileGroups = []
+                    file_groups = []
                     while True:
-                        group = input("Add file types to be grouped, separated by commas (.pdf, .txt, .docx). Enter nothing to finish: ")
+                        group = input(
+                            "Add file types to be grouped, separated by commas (.pdf, .txt, .docx). Enter nothing to "
+                            "finish: ")
                         if not group:
                             break
                         group = group.replace(' ', '').split(',')
-                        fileGroups.append(group)
-                    SortFiles(directoryToOrganize, targetDirectory, SortMethod.EXTENSION, includeFolders, usingGroups=True, usingCustomGroups=True, fileGroups=fileGroups)
+                        file_groups.append(group)
+                    sort_files(directory_to_organize, target_directory, SortMethod.EXTENSION, include_folders,
+                               using_groups=True, using_custom_groups=True, file_groups=file_groups)
             else:
-                SortFiles(directoryToOrganize, targetDirectory, SortMethod.EXTENSION, includeFolders)
+                sort_files(directory_to_organize, target_directory, SortMethod.EXTENSION, include_folders)
 
         case '3':
-            dateSortChoice = input("Would you like to sort by month or year? (MONTH/YEAR): ").lower()
-            while dateSortChoice != ("month" or "year"): dateSortChoice = input("Try again (MONTH/YEAR): ").lower()
-            if dateSortChoice == "month":
-                SortFiles(directoryToOrganize, targetDirectory, SortMethod.DATE, includeFolders, usingGroups=True)
+            date_sort_choice = input("Would you like to sort by month or year? (MONTH/YEAR): ").lower()
+            while date_sort_choice != ("month" or "year"):
+                date_sort_choice = input("Try again (MONTH/YEAR): ").lower()
+            if date_sort_choice == "month":
+                sort_files(directory_to_organize, target_directory, SortMethod.DATE, include_folders, using_groups=True)
             else:
-                SortFiles(directoryToOrganize, targetDirectory, SortMethod.DATE, includeFolders, usingGroups=False)
+                sort_files(directory_to_organize, target_directory, SortMethod.DATE, include_folders, using_groups=False)
 
         case '4':
             tag = input("Include files with what in their file name? (Example: *HIST 1101* Essay 1): ")
-            folderName = input("What should the folder be called? (Leave blank to use tag given): ")
-            SortFiles(directoryToOrganize, targetDirectory, SortMethod.TAG, includeFolders, nameTag=tag, tagFolder=folderName)
+            folder_name = input("What should the folder be called? (Leave blank to use tag given): ")
+            sort_files(directory_to_organize, target_directory, SortMethod.TAG, include_folders, name_tag=tag,
+                       tag_folder=folder_name)
 
         case _:
             print("Invalid choice.")
