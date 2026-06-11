@@ -46,18 +46,22 @@ def start():
         try:
             if not process_logs[i].rstrip():  # Empty line detected
                 break
+            if process_logs[i].rstrip() == '.':
+                i += 1
+                continue
         except IndexError:  # Possible end of file
             break
-        process = process_logs[i].split(' ')
+        process = process_logs[i].split('  ')
         old_location = process[0]
         new_location = process[2].rstrip()
         try:
             os.rename(new_location, old_location)
         except FileNotFoundError:
             failed_attempts += 1
-        if failed_attempts == 5:
-            raise LogFileError("Process could not be fully reverted.")
-        new_log_list.append(new_location + " => " + old_location + "\n")
+            if failed_attempts == 5:
+                FileMisc.log_process(new_log_list)
+                raise LogFileError("Process could not be fully reverted.")
+        new_log_list.append(new_location + "  =>  " + old_location + "\n")
         i += 1
     FileMisc.log_process(new_log_list)
     print("Done!")

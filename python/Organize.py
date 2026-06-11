@@ -26,8 +26,12 @@ def move_file(original_location, target_location, folder_name, file):
     old_location = os.path.join(original_location, file)
     os.makedirs(os.path.join(target_location, folder_name), exist_ok=True)
     new_location = os.path.join(target_location, folder_name, isolate_file(file))
-    os.rename(old_location, new_location)
-    log = old_location + " => " + str(new_location) + "\n"
+    log = old_location + "  =>  " + str(new_location) + "\n"
+    try:
+        os.rename(old_location, new_location)
+    except FileExistsError:
+        print(log + " failed")
+        log = '.\n'
     return log
 
 
